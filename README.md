@@ -138,4 +138,25 @@ Detailed setup instructions are in [`docs/snowflake_setup.md`](docs/snowflake_se
 
 ## Screenshots
 
-The [`screenshots/`](screenshots/) folder is ready for your actual Snowflake Snowsight screenshots. See [`screenshots/README.md`](screenshots/README.md) for the checklist.
+All 7 live Snowflake Snowsight execution screenshots are saved in [`screenshots/`](screenshots/) (see [`screenshots/README.md`](screenshots/README.md)):
+
+### 1. Database & Medallion Schemas (`BRONZE`, `SILVER`, `GOLD`)
+![Database Schemas](screenshots/01_database_schemas.png)
+
+### 2. Snowflake Internal Stage (`sample_sales.csv` – 9,008 bytes)
+![Internal Stage CSV](screenshots/02_internal_stage_csv.png)
+
+### 3. Bronze Layer (`BRONZE_SALES_RAW` – 82 rows)
+![Bronze 82 Rows](screenshots/03_bronze_82_rows.png)
+
+### 4. Silver Layer (`SILVER_SALES_CLEANED` – 80 rows)
+![Silver 80 Rows](screenshots/04_silver_80_rows.png)
+
+### 5. Gold Layer (4 Analytical Tables)
+![Four Gold Tables](screenshots/05_gold_four_tables.png)
+
+### 6. Top 10 Products (`GOLD_TOP_PRODUCTS`)
+![Top 10 Products](screenshots/06_gold_top_products.png)
+
+### 7. Confirmed Total Revenue (`33077.47`)
+![Total Revenue 33077.47](screenshots/07_total_revenue_33077_47.png)
