@@ -1,0 +1,6 @@
+flowchart LR
+    A["CSV File<br/>(sample_sales.csv)<br/>82 Raw Rows"] --> B["Snowflake Internal Stage<br/>(SALES_INTERNAL_STAGE)<br/>+ CSV_SALES_FORMAT"]
+    B -->|COPY INTO| C["BRONZE Layer<br/>(SALES_DB.BRONZE.BRONZE_SALES_RAW)<br/>82 Raw Rows + Lineage Metadata"]
+    C -->|Deduplicate, Clean & Cast| D["SILVER Layer<br/>(SALES_DB.SILVER.SILVER_SALES_CLEANED)<br/>80 Cleaned & Validated Rows"]
+    D -->|Aggregate & Rank| E["GOLD Layer<br/>(SALES_DB.GOLD)<br/>GOLD_MONTHLY_SALES<br/>GOLD_CATEGORY_SALES<br/>GOLD_REGIONAL_SALES<br/>GOLD_TOP_PRODUCTS"]
+    E --> F["Data Validation &<br/>Business Insights<br/>(06_data_validation.sql)"]

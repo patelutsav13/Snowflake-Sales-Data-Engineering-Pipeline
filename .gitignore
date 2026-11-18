@@ -1,0 +1,32 @@
+# ==============================================================================
+# .gitignore - Snowflake Sales Data Engineering Pipeline (Medallion Architecture)
+# Prevents accidental commits of secrets, credentials, and local IDE/OS files.
+# ==============================================================================
+
+# Secrets & Environment Files (NEVER commit credentials!)
+.env
+.env.*
+*.pem
+*.key
+*.p8
+*credentials*
+*secret*
+snowflake_config*
+connections.toml
+
+# Snowflake CLI local config
+.snowsql/
+.snowflake/
+
+# VS Code & IDE local settings
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
