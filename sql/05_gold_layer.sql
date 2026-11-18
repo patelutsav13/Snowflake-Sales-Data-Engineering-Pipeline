@@ -1,12 +1,11 @@
 -- =============================================================================
 -- FILE: 05_gold_layer.sql
 -- PURPOSE:
---   Create 4 simple, business-ready analytical tables in the GOLD schema from
---   cleaned SILVER_SALES_CLEANED data:
---     1. GOLD_MONTHLY_SALES   - Monthly revenue and order trend
---     2. GOLD_CATEGORY_SALES  - Revenue breakdown by product category
---     3. GOLD_REGIONAL_SALES  - Revenue breakdown by region with performance tier
---     4. GOLD_TOP_PRODUCTS    - Top 10 products ranked by revenue
+--   Create 4 analytical tables in SALES_DB.GOLD from SILVER_SALES_CLEANED:
+--     1. GOLD_MONTHLY_SALES   - Monthly orders, units sold, revenue & avg order value
+--     2. GOLD_CATEGORY_SALES  - Category orders, units sold, revenue & rank
+--     3. GOLD_REGIONAL_SALES  - Regional orders, customers, revenue & tier
+--     4. GOLD_TOP_PRODUCTS    - Top 10 products ranked by total revenue
 --
 -- WHERE TO RUN:
 --   Snowsight SQL Worksheet (run after 04_silver_layer.sql).
@@ -18,7 +17,7 @@ USE DATABASE SALES_DB;
 USE SCHEMA GOLD;
 
 -- -----------------------------------------------------------------------------
--- 1. GOLD_MONTHLY_SALES: Monthly revenue, orders, units sold & average order value
+-- 1. GOLD_MONTHLY_SALES: Monthly revenue and order summary
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE TABLE SALES_DB.GOLD.GOLD_MONTHLY_SALES AS
 SELECT
@@ -36,7 +35,7 @@ GROUP BY
 ORDER BY sales_month;
 
 -- -----------------------------------------------------------------------------
--- 2. GOLD_CATEGORY_SALES: Category revenue, units, share % and revenue rank
+-- 2. GOLD_CATEGORY_SALES: Revenue breakdown by product category
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE TABLE SALES_DB.GOLD.GOLD_CATEGORY_SALES AS
 WITH category_totals AS (
@@ -61,7 +60,7 @@ FROM category_totals
 ORDER BY total_revenue DESC;
 
 -- -----------------------------------------------------------------------------
--- 3. GOLD_REGIONAL_SALES: Region revenue with CASE WHEN performance tier
+-- 3. GOLD_REGIONAL_SALES: Revenue breakdown by region
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE TABLE SALES_DB.GOLD.GOLD_REGIONAL_SALES AS
 WITH region_totals AS (
@@ -126,7 +125,7 @@ LIMIT 10;
 -- VERIFICATION QUERIES
 -- =============================================================================
 
--- Overall Sales Summary KPIs
+-- Overall Total Revenue & Order Summary from Silver
 SELECT
     ROUND(SUM(sales_amount), 2) AS total_revenue,
     COUNT(DISTINCT order_id)    AS total_orders,

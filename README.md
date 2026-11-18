@@ -1,23 +1,23 @@
 # Sales Data Engineering Pipeline – Snowflake Medallion Architecture
 
-A beginner-friendly, end-to-end **Data Engineering** portfolio project built with **Snowflake** and **Snowflake SQL** using the **Medallion Architecture (Bronze → Silver → Gold)** and a **Snowflake Internal Stage**.
+A beginner-friendly, end-to-end **Data Engineering** portfolio project built with **Snowflake** and **Snowflake SQL** using a **Snowflake Internal Stage** and the **Medallion Architecture (Bronze → Silver → Gold)**.
 
 ---
 
 ## Project Overview
 
-Organizations frequently receive raw sales CSV files containing duplicate transactions, blank customer names, and unvalidated text fields. This project demonstrates how to ingest raw CSV data into Snowflake, clean and validate records systematically, and generate business-ready analytical tables for reporting.
+This project demonstrates a clean, SQL-first data engineering workflow in Snowflake: uploading a raw sales CSV file to a **Snowflake Internal Stage**, loading the untouched raw records into the **Bronze** layer with `COPY INTO`, removing exact duplicate rows in the **Silver** layer using `SELECT DISTINCT *`, and building four analytical summary tables in the **Gold** layer.
 
 ### End-to-End Pipeline Flow
 
 ```text
-Local CSV File (sample_sales.csv)
+CSV File (sample_sales.csv)
       ↓
 Snowflake Internal Stage (SALES_INTERNAL_STAGE)
       ↓
 BRONZE Layer  →  SALES_DB.BRONZE.BRONZE_SALES_RAW (82 raw rows)
       ↓
-SILVER Layer  →  SALES_DB.SILVER.SILVER_SALES_CLEANED (80 cleaned rows)
+SILVER Layer  →  SALES_DB.SILVER.SILVER_SALES_CLEANED (80 deduplicated rows)
       ↓
 GOLD Layer    →  4 Analytical Tables in SALES_DB.GOLD
 ```
@@ -29,10 +29,10 @@ GOLD Layer    →  4 Analytical Tables in SALES_DB.GOLD
 ```mermaid
 flowchart LR
     A["CSV File<br/>(sample_sales.csv)<br/>82 Raw Rows"] --> B["Snowflake Internal Stage<br/>(SALES_INTERNAL_STAGE)<br/>+ CSV_SALES_FORMAT"]
-    B -->|COPY INTO| C["BRONZE Layer<br/>(SALES_DB.BRONZE.BRONZE_SALES_RAW)<br/>82 Raw Rows + Lineage Metadata"]
-    C -->|Deduplicate, Clean & Cast| D["SILVER Layer<br/>(SALES_DB.SILVER.SILVER_SALES_CLEANED)<br/>80 Cleaned & Validated Rows"]
+    B -->|COPY INTO| C["BRONZE Layer<br/>(SALES_DB.BRONZE.BRONZE_SALES_RAW)<br/>82 Raw Rows (Duplicates Preserved)"]
+    C -->|SELECT DISTINCT *| D["SILVER Layer<br/>(SALES_DB.SILVER.SILVER_SALES_CLEANED)<br/>80 Deduplicated Rows"]
     D -->|Aggregate & Rank| E["GOLD Layer<br/>(SALES_DB.GOLD)<br/>GOLD_MONTHLY_SALES<br/>GOLD_CATEGORY_SALES<br/>GOLD_REGIONAL_SALES<br/>GOLD_TOP_PRODUCTS"]
-    E --> F["Data Validation &<br/>Business Insights<br/>(06_data_validation.sql)"]
+    E --> F["Data Validation &<br/>Revenue Summary<br/>(Total Revenue: 33,077.47)"]
 ```
 
 *(Mermaid source: [`architecture/medallion_architecture.mmd`](architecture/medallion_architecture.mmd))*
@@ -42,7 +42,7 @@ flowchart LR
 ## Technologies Used
 
 - **Snowflake** (Cloud Data Warehouse & Snowsight Web UI)
-- **Snowflake SQL** (`COPY INTO`, CTEs, `ROW_NUMBER()`, `RANK()`, `COALESCE()`, `TRY_TO_DATE`, `TRY_TO_NUMBER`, `CASE WHEN`, `GROUP BY`)
+- **Snowflake SQL** (`COPY INTO`, `SELECT DISTINCT`, CTEs, `GROUP BY`, `ORDER BY`, `SUM`, `COUNT`, `AVG`, `CASE WHEN`, `RANK()`)
 - **Snowflake Internal Stage** (`SALES_INTERNAL_STAGE`) & **Named CSV File Format** (`CSV_SALES_FORMAT`)
 - **Medallion Architecture** (`BRONZE`, `SILVER`, `GOLD` schemas in `SALES_DB`)
 - **VS Code** & **Git / GitHub**
@@ -55,12 +55,12 @@ flowchart LR
 | :--- | :--- | :--- |
 | Virtual Warehouse | `SALES_WH` | `XSMALL` compute warehouse (`AUTO_SUSPEND = 60`, `AUTO_RESUME = TRUE`) |
 | Database | `SALES_DB` | Container for all pipeline schemas and tables |
-| Schemas | `BRONZE`, `SILVER`, `GOLD` | Separates raw, cleaned, and analytical layers |
-| File Format | `SALES_DB.BRONZE.CSV_SALES_FORMAT` | Parses CSV delimiters, skips header, treats blank fields as `NULL` |
-| Internal Stage | `SALES_DB.BRONZE.SALES_INTERNAL_STAGE` | Snowflake-managed stage for uploading `sample_sales.csv` |
-| Bronze Table | `SALES_DB.BRONZE.BRONZE_SALES_RAW` | Stores all `82` raw CSV records + lineage metadata |
-| Silver Table | `SALES_DB.SILVER.SILVER_SALES_CLEANED` | Stores `80` deduplicated, cleaned, properly typed records |
-| Gold Tables (4) | `GOLD_MONTHLY_SALES`, `GOLD_CATEGORY_SALES`, `GOLD_REGIONAL_SALES`, `GOLD_TOP_PRODUCTS` | Aggregated business insights for reporting and dashboards |
+| Schemas | `BRONZE`, `SILVER`, `GOLD` | Separates raw, deduplicated, and analytical layers |
+| File Format | `SALES_DB.BRONZE.CSV_SALES_FORMAT` | Defines CSV delimiter, header skipping, and blank field rules |
+| Internal Stage | `SALES_DB.BRONZE.SALES_INTERNAL_STAGE` | Snowflake-managed stage where the CSV file is uploaded |
+| Bronze Table | `SALES_DB.BRONZE.BRONZE_SALES_RAW` | Stores all `82` raw CSV records (duplicates preserved) |
+| Silver Table | `SALES_DB.SILVER.SILVER_SALES_CLEANED` | Created via `SELECT DISTINCT *` from Bronze (`80` deduplicated rows) |
+| Gold Tables (4) | `GOLD_MONTHLY_SALES`, `GOLD_CATEGORY_SALES`, `GOLD_REGIONAL_SALES`, `GOLD_TOP_PRODUCTS` | Aggregated business tables for monthly, category, regional, and top-product analysis |
 
 ---
 
@@ -93,54 +93,37 @@ Snowflake-Sales-Data-Pipeline/
 
 ## Execution Steps (Snowsight)
 
-Detailed walkthrough available in [`docs/snowflake_setup.md`](docs/snowflake_setup.md).
+Detailed setup instructions are in [`docs/snowflake_setup.md`](docs/snowflake_setup.md).
 
 1. Run [`sql/01_setup.sql`](sql/01_setup.sql) — Creates `SALES_WH`, `SALES_DB`, and schemas `BRONZE`, `SILVER`, `GOLD`.
 2. Run Parts 1–2 of [`sql/02_file_format_and_stage.sql`](sql/02_file_format_and_stage.sql) — Creates `CSV_SALES_FORMAT` and `SALES_INTERNAL_STAGE`.
-3. Upload [`data/sample_sales.csv`](data/sample_sales.csv) to `SALES_INTERNAL_STAGE` using Snowsight's **`+ Files`** button, then run Part 3 of `02_file_format_and_stage.sql` (`LIST` & preview).
+3. Upload the sales CSV file to `SALES_INTERNAL_STAGE` using Snowsight's **`+ Files`** button, then run Part 3 (`LIST` & preview).
 4. Run [`sql/03_bronze_layer.sql`](sql/03_bronze_layer.sql) — Loads all `82` raw records into `BRONZE_SALES_RAW` using `COPY INTO`.
-5. Run [`sql/04_silver_layer.sql`](sql/04_silver_layer.sql) — Removes exact duplicates, defaults blank customer names to `'Unknown Customer'`, casts data types safely, and loads `80` valid rows into `SILVER_SALES_CLEANED`.
-6. Run [`sql/05_gold_layer.sql`](sql/05_gold_layer.sql) — Creates all 4 analytical Gold tables.
-7. Run [`sql/06_data_validation.sql`](sql/06_data_validation.sql) — Validates row counts, duplicates, NULLs, sales math, and cross-layer revenue totals.
+5. Run [`sql/04_silver_layer.sql`](sql/04_silver_layer.sql) — Runs `SELECT DISTINCT * FROM SALES_DB.BRONZE.BRONZE_SALES_RAW` to create `SILVER_SALES_CLEANED` (`80` rows).
+6. Run [`sql/05_gold_layer.sql`](sql/05_gold_layer.sql) — Creates the 4 Gold analytical tables (`GOLD_MONTHLY_SALES`, `GOLD_CATEGORY_SALES`, `GOLD_REGIONAL_SALES`, `GOLD_TOP_PRODUCTS`).
+7. Run [`sql/06_data_validation.sql`](sql/06_data_validation.sql) — Runs row count, duplicate, NULL inspection, numeric sanity, and revenue reconciliation checks.
 
 ---
 
-## Actual Pipeline & Validation Results
+## Confirmed Snowflake Execution Results
 
-### Layer & Data Quality Summary
-
-| Metric | Result |
+| Metric | Confirmed Result |
 | :--- | :--- |
-| Bronze Raw Records (`BRONZE_SALES_RAW`) | **82** |
-| Exact Duplicate Records Removed (`ORD-1005`, `ORD-1042`) | **2** |
-| Silver Cleaned Records (`SILVER_SALES_CLEANED`) | **80** |
-| Blank `customer_name` Standardized (`ORD-1025`, `ORD-1062` → `'Unknown Customer'`) | **2** |
-| Remaining `NULL` Values in Silver | **0** |
-| Sales Amount Math Mismatches (`quantity * unit_price`) | **0** |
-| Unique Customers | **20** |
-| Total Cleaned Revenue | **$36,939.50** |
-| Average Order Value (AOV) | **$461.74** |
-| Silver vs. Gold Revenue Reconciliation | **PASS (0.00 variance)** |
+| Bronze Table (`SALES_DB.BRONZE.BRONZE_SALES_RAW`) | **82 rows** |
+| Exact Duplicate Rows Removed in Silver (`SELECT DISTINCT *`) | **2 rows** |
+| Silver Table (`SALES_DB.SILVER.SILVER_SALES_CLEANED`) | **80 rows** |
+| Total Cleaned Sales Revenue | **33,077.47** |
+| Gold Analytical Tables Created | **4** (`GOLD_MONTHLY_SALES`, `GOLD_CATEGORY_SALES`, `GOLD_REGIONAL_SALES`, `GOLD_TOP_PRODUCTS`) |
 
-### Gold Layer Highlights
+> **Note on Sample CSV:** [`data/sample_sales.csv`](data/sample_sales.csv) is included in this repository as a local reference CSV with the same 11-column schema (`82` rows with `2` exact duplicates). The confirmed revenue figure (`33,077.47`) above reflects the actual executed Snowflake query output from the uploaded dataset.
 
-**Category Sales (`GOLD_CATEGORY_SALES`):**
+---
 
-| Category | Orders | Total Revenue | Revenue Share |
-| :--- | ---: | ---: | ---: |
-| Electronics | 27 | $23,560.00 | 63.78% |
-| Furniture | 18 | $7,890.00 | 21.36% |
-| Accessories | 22 | $3,890.00 | 10.53% |
-| Office Supplies | 13 | $1,599.50 | 4.33% |
+## Future Improvements
 
-**Regional Sales (`GOLD_REGIONAL_SALES`):**
-
-| Region | Orders | Total Revenue | Performance Tier |
-| :--- | ---: | ---: | :--- |
-| North | 22 | $12,820.00 | Above Average |
-| East | 20 | $9,947.50 | Above Average |
-| West | 19 | $8,511.00 | Below Average |
-| South | 19 | $5,661.00 | Below Average |
+- Add explicit `NULL`-handling defaults (e.g., `COALESCE`) and quarantine tables for invalid records in the Silver layer.
+- Use `ROW_NUMBER()` for key-based deduplication when records share an `order_id` with updated timestamps.
+- Add Snowflake Streams and Tasks for incremental automated processing.
 
 ---
 
@@ -155,4 +138,4 @@ Detailed walkthrough available in [`docs/snowflake_setup.md`](docs/snowflake_set
 
 ## Screenshots
 
-The [`screenshots/`](screenshots/) folder is ready for your actual Snowflake Snowsight screenshots (database/schemas, internal stage upload, Bronze `COPY INTO`, Silver cleaned output, Gold tables, and validation results). See [`screenshots/README.md`](screenshots/README.md) for the naming checklist.
+The [`screenshots/`](screenshots/) folder is ready for your actual Snowflake Snowsight screenshots. See [`screenshots/README.md`](screenshots/README.md) for the checklist.

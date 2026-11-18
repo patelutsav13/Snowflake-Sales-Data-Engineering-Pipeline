@@ -1,47 +1,48 @@
 # Internship Interview Preparation – Q&A Guide
 
-Use this quick-reference guide to explain your **Snowflake Sales Data Engineering Pipeline** confidently during Data Engineering internship interviews.
+Use this guide to explain your **Snowflake Sales Data Engineering Pipeline** clearly and honestly in Data Engineering internship interviews.
 
 ---
 
-## 1. 60-Second Project Pitch (Memorize the Flow)
+## 1. 60-Second Project Pitch
 
-> "I built an end-to-end Sales Data Engineering Pipeline in Snowflake using the **Medallion Architecture** (Bronze, Silver, and Gold layers). I uploaded a raw sales CSV file into a Snowflake Internal Stage and ingested it into the **Bronze** layer using `COPY INTO`, keeping all raw records and duplicates along with file metadata for auditing. In the **Silver** layer, I cleaned the data using SQL—removing exact duplicates with `ROW_NUMBER()`, handling missing customer names with `COALESCE()`, safely casting dates and numbers with `TRY_TO_DATE` and `TRY_TO_NUMBER`, and validating sales math. Finally, in the **Gold** layer, I created four analytical tables for monthly trends, category performance, regional performance, and top 10 products, and wrote a validation script to verify row counts, NULLs, and cross-layer revenue reconciliation."
+> "I built a Sales Data Engineering Pipeline in Snowflake using a **Snowflake Internal Stage** and the **Medallion Architecture** (`BRONZE`, `SILVER`, and `GOLD` schemas inside `SALES_DB`). First, I uploaded the raw sales CSV file to `SALES_INTERNAL_STAGE` and loaded all 82 raw records into `BRONZE_SALES_RAW` using `COPY INTO`, keeping duplicates intact for auditing. Next, I created `SILVER_SALES_CLEANED` using `SELECT DISTINCT * FROM SALES_DB.BRONZE.BRONZE_SALES_RAW`, removing 2 exact duplicate rows to produce 80 clean rows with total revenue of 33,077.47. Finally, I built four Gold analytical tables (`GOLD_MONTHLY_SALES`, `GOLD_CATEGORY_SALES`, `GOLD_REGIONAL_SALES`, and `GOLD_TOP_PRODUCTS`) using SQL aggregations and ranking functions, and wrote validation queries to verify row counts and cross-layer revenue totals."
 
 ---
 
-## 2. Common Interview Questions & Simple Answers
+## 2. Common Interview Questions & Accurate Answers
 
-### Q1. What is Snowflake, and why is it popular?
-**Answer:** Snowflake is a cloud-based data warehouse that separates **storage** and **compute**. You can scale compute (Virtual Warehouses) up or down independently, and configure `AUTO_SUSPEND` and `AUTO_RESUME` so you only pay when queries are actually running.
+### Q1. What is Snowflake, and why is it widely used?
+**Answer:** Snowflake is a cloud data warehouse that separates **storage** and **compute**. You can resize Virtual Warehouses independently and configure `AUTO_SUSPEND` and `AUTO_RESUME` so compute only runs when queries execute.
 
 ### Q2. What is Medallion Architecture?
-**Answer:** It is a three-layer data design pattern:
-- **Bronze:** Raw, unchanged source data (for backup and auditing).
-- **Silver:** Cleaned, deduplicated, validated, and typed data (single source of truth).
-- **Gold:** Pre-aggregated business tables ready for dashboards and reporting.
+**Answer:** It is a three-layer data organization pattern:
+- **Bronze (`BRONZE_SALES_RAW`):** Raw ingested data kept unchanged for auditing (`82` rows).
+- **Silver (`SILVER_SALES_CLEANED`):** Deduplicated dataset ready for downstream queries (`80` rows).
+- **Gold (`GOLD_*` tables):** Pre-aggregated analytical tables built for reporting and dashboards.
 
-### Q3. Why didn't you remove duplicates directly in the Bronze layer?
-**Answer:** Bronze should always stay an exact historical copy of what arrived from the source. If a stakeholder questions a figure or if our cleaning rules change later, we can re-run the Silver transformation from Bronze without needing the source file again.
+### Q3. Why did you keep duplicates in Bronze instead of deleting them during ingestion?
+**Answer:** Bronze should stay an exact copy of the source file. Keeping raw data untouched makes it easy to audit what arrived and re-run Silver transformations later if business rules change.
 
-### Q4. Why did you store Bronze columns as `VARCHAR` instead of `DATE` or `NUMBER`?
-**Answer:** Storing raw columns as text prevents `COPY INTO` from failing if a future CSV file contains a bad date or typo in a number. We safely cast types in Silver using `TRY_TO_DATE` and `TRY_TO_NUMBER`, which return `NULL` instead of crashing the query.
+### Q4. How did you remove duplicates in the Silver layer?
+**Answer:** Since the duplicates in this dataset were exact row-level duplicates, I created `SILVER_SALES_CLEANED` using:
+```sql
+SELECT DISTINCT *
+FROM SALES_DB.BRONZE.BRONZE_SALES_RAW;
+```
+This cleanly reduced the dataset from `82` rows in Bronze to `80` unique rows in Silver.
 
-### Q5. How did you remove exact duplicate records in SQL?
-**Answer:** I used the `ROW_NUMBER()` window function partitioned by all business columns and ordered deterministically by `ingested_at`, `source_file_name`, and `source_file_row_number`, then kept only `WHERE row_num = 1`.
+### Q5. What if a future dataset has partial duplicates (same `order_id` with different values) or NULL/dirty fields?
+**Answer:** *(Great way to show production thinking without exaggerating what you built!)* In a production upgrade, I would:
+1. Keep raw Bronze columns as `VARCHAR` and add ingestion metadata (`METADATA$FILENAME`, `ingested_at`).
+2. Use `ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY ingested_at DESC)` in Silver to keep the latest record per order.
+3. Add explicit `COALESCE()` defaults for optional text fields, `TRY_TO_DATE`/`TRY_TO_NUMBER` for safe type casting, and a quarantine table for invalid records.
 
-### Q6. How did you handle missing (`NULL`) values?
-**Answer:** First, my `CSV_SALES_FORMAT` converts empty CSV fields (`EMPTY_FIELD_AS_NULL = TRUE`) into SQL `NULL`. In Silver, optional descriptive fields like blank `customer_name` are replaced with `'Unknown Customer'` using `COALESCE()`, while rows missing critical fields like `order_id`, `order_date`, or `sales_amount` are filtered out.
+### Q6. What is a Snowflake Internal Stage?
+**Answer:** An Internal Stage is a storage location managed directly inside Snowflake where you can upload local CSV files via Snowsight and load them into tables using `COPY INTO`—without setting up external cloud storage.
 
-### Q7. What is a Snowflake Internal Stage?
-**Answer:** An Internal Stage is a built-in storage area managed directly by Snowflake where you can upload local files (like CSVs) and then load them into tables using `COPY INTO`—without needing external cloud storage.
+### Q7. How did you verify that your pipeline worked properly?
+**Answer:** I ran SQL validation queries (`06_data_validation.sql`) to compare Bronze (`82` rows) vs. Silver (`80` rows), inspect duplicate rows in Bronze, check for NULLs or non-positive numbers, confirm total Silver revenue (`33,077.47`), and verify that Gold summary tables reconcile with Silver revenue.
 
-### Q8. How did you verify that your pipeline results are accurate?
-**Answer:** I created `06_data_validation.sql` to check:
-1. Bronze row count vs. Silver row count (confirming only exact duplicates/invalid rows were removed).
-2. Zero remaining `NULL` values in `SILVER_SALES_CLEANED`.
-3. Zero negative quantities/prices or `quantity * unit_price` mismatches.
-4. Cross-layer revenue reconciliation confirming that total revenue in `GOLD_MONTHLY_SALES`, `GOLD_CATEGORY_SALES`, and `GOLD_REGIONAL_SALES` equals `SILVER_SALES_CLEANED` with `0.00` variance.
-
-### Q9. Why did you set `AUTO_SUSPEND = 60` and `AUTO_RESUME = TRUE` on `SALES_WH`?
-**Answer:** To save Snowflake compute credits. The warehouse automatically pauses after 60 seconds of inactivity and wakes up automatically the next time someone runs a query.
+### Q8. Why did you configure `AUTO_SUSPEND = 60` and `AUTO_RESUME = TRUE` on `SALES_WH`?
+**Answer:** To control cloud costs. The warehouse automatically pauses after 60 seconds of inactivity and resumes automatically when a new SQL query is submitted.
